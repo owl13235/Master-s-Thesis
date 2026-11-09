@@ -1,0 +1,52 @@
+import os
+import numpy as np
+
+# --- Caricamento Parametri ---
+try:
+    with open('input_dynamics.inp', 'r') as file:
+        line = file.readline().split()
+        # Assicurarsi che gli indici corrispondano alla struttura del file .inp
+        n_obs = int(line[6])
+        n_times = int(line[9]) + 1 
+except FileNotFoundError:
+    raise FileNotFoundError("File input_dynamics.inp non trovato.")
+
+# --- Lettura Dati Binari ---
+file_re = 'oss_RE.bin'
+file_im = 'oss_IM.bin'
+count = n_times * (n_obs + 1)
+
+# Lettura dei dati come float64 (equivalente a double in C/MATLAB)
+vec_re_flat = np.fromfile(file_re, dtype=np.float64, count=count)
+vec_im_flat = np.fromfile(file_im, dtype=np.float64, count=count)
+
+# Reshape in matrici (n_righe: n_times, n_colonne: n_obs + 1)
+# La prima colonna solitamente contiene il vettore dei tempi
+mat_re = vec_re_flat.reshape((n_times, n_obs + 1))
+mat_im = vec_im_flat.reshape((n_times, n_obs + 1))
+
+# --- Costruzione del Vettore degli Osservabili ---
+# Si assume che la colonna 0 sia il tempo e le successive gli osservabili
+# Calcolo: O(t) = Re[O] + i * Im[O]
+# Nota: mat_re[:, 0] viene sommato come offset reale se richiesto dalla tua logica
+vec_complex = mat_re[:, 1:] + 1j * mat_im[:, 1:]
+
+# --- Gestione File di Output ---
+counter = 1
+while True:
+    info_filename = f"DATI/data_{counter}.dat"
+    if not os.path.exists(info_filename):
+        # Se il file non esiste, usiamo il precedente (se esiste) o questo
+        target_filename = f"DATI/data_{max(1, counter-1)}.dat"
+        break
+    counter += 1
+
+# --- Salvataggio Dati ---
+# Salvataggio in formato scientifico ad alta precisione
+os.makedirs("DATI", exist_ok=True) # Crea la cartella se non esiste
+with open(target_filename, 'a') as f:
+    # Salviamo la parte reale o il modulo a seconda della necessità fisica
+    # Qui salviamo la matrice complessa (verrà scritta come (re+imj))
+    np.savetxt(f, vec_complex, fmt='%.18e')
+
+print(f"Operazione completata. Dati scritti in: {target_filename}")
